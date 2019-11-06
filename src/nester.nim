@@ -180,6 +180,5 @@ proc serve*(r: NesterRouter, p: Port = Port(5000), staticPath: string = "") =
 
             echo ">~", request.url.path, " ", request.body, " in ", formatFloat(epochTime() - t0, format = ffDecimal, precision = 3), "s"
 
-    while true:
-        if hasPendingOperations(): # avoid ValueError in case no operations are pending
-            drain(timeout = 0)
+    runForever()
+

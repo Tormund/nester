@@ -135,6 +135,12 @@ proc startServer(r: NesterRouter, p: Port, cb: proc(request: Request): Future[vo
         echo getCurrentException().getStackTrace()
 
 proc serve*(r: NesterRouter, p: Port = Port(5000), staticPath: string = "") =
+    echo "serving nester "
+    if "/" notin r.routesRegistry:
+        echo "set nester default redirect "
+        r.routes:
+            get "/": redirect "index.html"
+
     r.nestRouter.compress()
     r.staticPath = staticPath
 
@@ -180,7 +186,7 @@ proc serve*(r: NesterRouter, p: Port = Port(5000), staticPath: string = "") =
 
             echo ">~", request.url.path, " ", request.body, " in ", formatFloat(epochTime() - t0, format = ffDecimal, precision = 3), "s"
 
-    let timeout = when defined(windows): 0 else: 500
+    let timeout = 500
     while true:
         if hasPendingOperations(): # avoid ValueError in case no operations are pending
             drain(timeout = timeout)

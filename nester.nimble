@@ -1,14 +1,12 @@
-# Package
-
-version       = "0.1.2"
+version       = "0.2.0"
 author        = "Volodymyr Melnychuk"
-description   = "A new awesome nimble package"
+description   = "Simple HTTP server"
 license       = "MIT"
+
 srcDir        = "src"
-
-
-
-# Dependencies
+bin           = @["nestd"]
+installExt    = @["nim"]
 
 requires "nim >= 0.20.0"
 requires "https://github.com/kedean/nest"
+requires "cligen"

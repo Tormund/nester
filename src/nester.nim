@@ -2,7 +2,7 @@ import nest
 import
     strutils, tables, oids, os, times, md5, strtabs,
     asynchttpserver, asyncdispatch, asyncfile, asyncnet,
-    httpcore, cookies, mimetypes
+    httpcore, cookies, mimetypes, uri
 
 export
     asynchttpserver, strtabs, map, HttpMethod, asyncdispatch
@@ -49,6 +49,7 @@ template post*(router: Router, path: string, body: untyped) =
 template resp*(code: HttpCode,
                headers: openarray[tuple[key, val: string]],
                content: string) =
+    echo "< \n", indent(content, 4)
     yield request.respond(code, content, newHttpHeaders(headers))
 
 template resp*(code: HttpCode, content: string,
@@ -150,41 +151,47 @@ proc serve*(r: NesterRouter, p: Port = Port(5000), staticPath: string = "") =
     echo "Nester serves ", r.routesRegistry
 
     asyncCheck startServer(r, p) do(request: Request) {.async, gcsafe.}:
-        if request.reqMethod == HttpOptions:
-            await allowCrossOriginRequests(request)
-        else:
-            echo "> ", request.url.path, " ", request.body
-
-            let res = r.nestRouter.route($request.reqMethod, request.url, request.headers)
-            let t0 = epochTime()
-
-            if res.status == routingFailure and $request.url notin r.routesRegistry and request.reqMethod == HttpMethod.HttpGet:
-                let p = r.staticPath / request.url.path
-                if existsFile(p):
-                    await r.sendFile(request, p)
-                else:
-                    resp(Http404, "Resource not found")
-            elif res.status == routingFailure:
-                resp(Http404, "Resource not found")
+        try:
+            if request.reqMethod == HttpOptions:
+                await allowCrossOriginRequests(request)
             else:
-                var ok = false
-                var requestId: string
-                try:
-                    await res.handler(request, res.arguments)
-                    ok = true
-                except:
-                    requestId = $genOid()
-                    echo "Exception caught(", requestId, "): ", getCurrentExceptionMsg()
-                    echo getCurrentException().getStackTrace()
 
-                if not ok:
-                    if requestId.len > 0:
-                        requestId = " Request id: " & requestId
+                echo "> ", request.url.path, "\n", indent(request.body, 4)
+
+                let res = r.nestRouter.route($request.reqMethod, request.url, request.headers)
+                let t0 = epochTime()
+
+                if res.status == routingFailure and $request.url notin r.routesRegistry and request.reqMethod == HttpMethod.HttpGet:
+                    let p = r.staticPath / request.url.path
+                    if existsFile(p):
+                        await r.sendFile(request, p)
                     else:
-                        requestId = ""
-                    resp(Http500, "Internal server error." & requestId)
+                        resp(Http404, "Resource not found")
+                elif res.status == routingFailure:
+                    resp(Http404, "Resource not found")
+                else:
+                    var ok = false
+                    var requestId: string
+                    try:
+                        await res.handler(request, res.arguments)
+                        ok = true
+                    except:
+                        requestId = $genOid()
+                        echo "Exception caught(", requestId, "): ", getCurrentExceptionMsg()
+                        echo getCurrentException().getStackTrace()
 
-            echo ">~", request.url.path, " ", request.body, " in ", formatFloat(epochTime() - t0, format = ffDecimal, precision = 3), "s"
+                    if not ok:
+                        if requestId.len > 0:
+                            requestId = " Request id: " & requestId
+                        else:
+                            requestId = ""
+                        resp(Http500, "Internal server error." & requestId)
+
+                echo ">~", request.url.path, " in ", formatFloat(epochTime() - t0, format = ffDecimal, precision = 3), "s"
+        except Exception as e:
+            echo "Invalid request ", request.url, " ", request.body
+            echo e.msg
+            echo getStackTrace(e)
 
     let timeout = 500
     while true:

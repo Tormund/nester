@@ -8,7 +8,7 @@ export
     asynchttpserver, strtabs, map, HttpMethod, asyncdispatch
 
 type
-    Handler = proc(r: Request, args: RoutingArgs): Future[void]
+    Handler = proc(r: Request, args: RoutingArgs): Future[void] {.gcsafe.}
     NesterRouter* = ref object
         nestRouter: Router[Handler]
         routesRegistry: Table[string, HttpMethod]
@@ -20,7 +20,7 @@ proc newRouter*(): NesterRouter =
     result.nestRouter = nest.newRouter[Handler]()
     result.routesRegistry = initTable[string, HttpMethod]()
 
-var gRouter: NesterRouter
+var gRouter {.threadVar.}: NesterRouter
 proc sharedRouter*(): NesterRouter =
     if gRouter.isNil:
         gRouter = newRouter()
@@ -93,11 +93,10 @@ proc allowCrossOriginRequests(r: Request) {.async.} =
     await r.respond(Http200, "", headers)
 
 const CL = "\c\L"
-let mimes = newMimetypes()
 template rawPresendFile(request: Request, file: string): Future[void] =
     var msg = "HTTP/1.1 " & $Http200 & CL
 
-    msg.add("Content-Type: " & mimes.getMimetype(file.splitFile.ext[1..^1]))
+    msg.add("Content-Type: " & newMimetypes().getMimetype(file.splitFile.ext[1..^1]))
     msg.add(CL)
 
     msg.add("Content-Length: " & $getFileSize(file))
@@ -163,7 +162,7 @@ proc serve*(r: NesterRouter, p: Port = Port(5000), staticPath: string = "") =
 
                 if res.status == routingFailure and $request.url notin r.routesRegistry and request.reqMethod == HttpMethod.HttpGet:
                     let p = r.staticPath / request.url.path
-                    if existsFile(p):
+                    if fileExists(p):
                         await r.sendFile(request, p)
                     else:
                         resp(Http404, "Resource not found")

@@ -28,7 +28,7 @@ proc sharedRouter*(): NesterRouter =
 
 template map(router: Router, action: string, path: string, handler: untyped) =
     block:
-        proc handleRoute(r: Request, args: RoutingArgs) {.async.} =
+        proc handleRoute(r: Request, args: RoutingArgs) {.async, gcsafe.} =
             template request: Request {.inject, used.} = r
             var parms: StringTableRef
             template params(r: Request): StringTableRef {.inject, used.} =

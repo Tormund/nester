@@ -134,7 +134,7 @@ proc startServer(r: NesterRouter, p: Port, cb: proc(request: Request): Future[vo
         echo "Exception caught while closing server: ", getCurrentExceptionMsg()
         echo getCurrentException().getStackTrace()
 
-proc serve*(r: NesterRouter, p: Port = Port(5000), staticPath: string = "") =
+proc start*(r: NesterRouter, p: Port = Port(5000), staticPath: string = "") =
     echo "serving nester "
     if "/" notin r.routesRegistry:
         echo "set nester default redirect "
@@ -192,6 +192,9 @@ proc serve*(r: NesterRouter, p: Port = Port(5000), staticPath: string = "") =
             echo e.msg
             echo getStackTrace(e)
 
+
+proc serve*(r: NesterRouter, p: Port = Port(5000), staticPath: string = "") =
+    r.start(p, staticPath)
     let timeout = 500
     while true:
         if hasPendingOperations(): # avoid ValueError in case no operations are pending

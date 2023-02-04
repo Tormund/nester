@@ -121,9 +121,9 @@ proc sendFile(r: NesterRouter, request: Request, file: string) {.async.} =
             value = await file.read(packsz)
         file.close()
 
-proc startServer(r: NesterRouter, p: Port, cb: proc(request: Request): Future[void] {.gcsafe.} ) {.async.} =
+proc startServer(r: NesterRouter, address = "", p: Port, cb: proc(request: Request): Future[void] {.gcsafe.} ) {.async.} =
     try:
-        await r.httpServer.serve(p, cb)
+        await r.httpServer.serve(p, cb, address = address)
     except:
         echo "Exception caught in server: ", getCurrentExceptionMsg()
         echo getCurrentException().getStackTrace()
@@ -134,7 +134,7 @@ proc startServer(r: NesterRouter, p: Port, cb: proc(request: Request): Future[vo
         echo "Exception caught while closing server: ", getCurrentExceptionMsg()
         echo getCurrentException().getStackTrace()
 
-proc start*(r: NesterRouter, p: Port = Port(5000), staticPath: string = "") =
+proc start*(r: NesterRouter, address = "", p: Port = Port(5000), staticPath: string = "") =
     echo "serving nester "
     if "/" notin r.routesRegistry:
         echo "set nester default redirect "
@@ -146,10 +146,10 @@ proc start*(r: NesterRouter, p: Port = Port(5000), staticPath: string = "") =
 
     r.httpServer = newAsyncHttpServer()
 
-    echo "Nester started 127.0.0.1:", $(p.uint16)
+    echo "Nester started http://", if address.len == 0: "127.0.0.1" else: address ,":", $(p.uint16)
     echo "Nester serves ", r.routesRegistry
 
-    asyncCheck startServer(r, p) do(request: Request) {.async, gcsafe.}:
+    asyncCheck r.startServer(address, p) do(request: Request) {.async, gcsafe.}:
         try:
             if request.reqMethod == HttpOptions:
                 await allowCrossOriginRequests(request)
@@ -164,6 +164,8 @@ proc start*(r: NesterRouter, p: Port = Port(5000), staticPath: string = "") =
                     let p = r.staticPath / request.url.path
                     if fileExists(p):
                         await r.sendFile(request, p)
+                    elif fileExists(p / "index.html"):
+                        redirect p / "index.html"
                     else:
                         resp(Http404, "Resource not found")
                 elif res.status == routingFailure:
@@ -193,8 +195,8 @@ proc start*(r: NesterRouter, p: Port = Port(5000), staticPath: string = "") =
             echo getStackTrace(e)
 
 
-proc serve*(r: NesterRouter, p: Port = Port(5000), staticPath: string = "") =
-    r.start(p, staticPath)
+proc serve*(r: NesterRouter, address="", p: Port = Port(5000), staticPath: string = "") =
+    r.start(address, p, staticPath)
     let timeout = 500
     while true:
         if hasPendingOperations(): # avoid ValueError in case no operations are pending

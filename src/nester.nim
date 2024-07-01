@@ -136,10 +136,6 @@ proc startServer(r: NesterRouter, address = "", p: Port, cb: proc(request: Reque
 
 proc start*(r: NesterRouter, address = "", p: Port = Port(5000), staticPath: string = "") =
     echo "serving nester "
-    if "/" notin r.routesRegistry:
-        echo "set nester default redirect "
-        r.routes:
-            get "/": redirect "index.html"
 
     r.nestRouter.compress()
     r.staticPath = staticPath
@@ -165,7 +161,7 @@ proc start*(r: NesterRouter, address = "", p: Port = Port(5000), staticPath: str
                     if fileExists(p):
                         await r.sendFile(request, p)
                     elif fileExists(p / "index.html"):
-                        redirect p / "index.html"
+                        await r.sendFile(request, p / "index.html")
                     else:
                         resp(Http404, "Resource not found")
                 elif res.status == routingFailure:
